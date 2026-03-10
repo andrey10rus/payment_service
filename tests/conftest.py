@@ -4,10 +4,13 @@ from sqlalchemy.orm import sessionmaker
 from app.database import Base, get_db
 from app.main import app
 from httpx import AsyncClient, ASGITransport
+from app.settings import Settings
 
-SQLALCHEMY_TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
+settings = Settings()
 
-engine = create_async_engine(SQLALCHEMY_TEST_DATABASE_URL, echo=False, future=True)
+TEST_DATABASE_URL = settings.TEST_DATABASE_URL
+
+engine = create_async_engine(TEST_DATABASE_URL, echo=False, future=True)
 
 AsyncTestingSessionLocal = sessionmaker(
     bind=engine, class_=AsyncSession, expire_on_commit=False
