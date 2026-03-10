@@ -1,5 +1,6 @@
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from ..models import Order, Payment
 from ..enums import PaymentStatus, PaymentType
 from .bank_api import BankAPI
@@ -24,6 +25,50 @@ class PaymentService:
             order.status = PaymentStatus.PARTIAL.value
         else:
             order.status = PaymentStatus.PAID.value
+
+    async def get_payment(self, db: AsyncSession, payment_id: int) -> Payment:
+
+        payment: Payment | None = await db.get(Payment, payment_id)
+
+        if not payment:
+            raise ValueError("payment not found")
+
+        acquiring = await bank_api.acquiring_check(payment)
+
+        bank_status = acquiring.get("status")
+
+        if bank_status and payment.status != bank_status:
+            payment.status = bank_status
+            await db.commit()
+            await db.refresh(payment)
+
+        return payment
+
+    async def get_payments(
+        self,
+        db: AsyncSession,
+        order_id: int | None = None,
+    ) -> list[Payment]:
+
+        query = select(Payment)
+
+        if order_id is not None:
+            query = query.where(Payment.order_id == order_id)
+
+        result = await db.execute(query)
+        payments = result.scalars().all()
+
+        for payment in payments:
+
+            acquiring = await bank_api.acquiring_check(payment)
+            bank_status = acquiring.get("status")
+
+            if bank_status and bank_status != payment.status:
+                payment.status = bank_status
+
+        await db.commit()
+
+        return payments
 
     async def deposit(
         self,
@@ -70,12 +115,16 @@ class PaymentService:
         Только для уже оплаченных.
         """
         payment: Payment | None = await db.get(Payment, payment_id)
-        if not payment:
+        if payment is None:
             raise ValueError("payment not found")
 
         acquiring = await bank_api.acquiring_check(payment)
+        bank_status = acquiring.get("status")
 
-        if acquiring.get("status") != PaymentStatus.PAID.value:
+        if bank_status and payment.status != bank_status:
+            payment.status = bank_status
+
+        if payment.status != PaymentStatus.PAID.value:
             raise ValueError("only paid payments can be refunded")
 
         order: Order = payment.order

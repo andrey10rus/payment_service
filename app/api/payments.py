@@ -10,6 +10,56 @@ router = APIRouter()
 service = PaymentService()
 
 
+@router.get(
+    "/payments/{payment_id}",
+    responses={
+        404: {"description": "Платеж не найден"},
+        200: {"description": "Платеж получен успешно"},
+    },
+)
+async def get_payment(
+    payment_id: int, db: AsyncSession = Depends(get_db)
+) -> PaymentResponse:
+    """
+    Получить платеж по payment_id.
+
+    Аргументы:
+    - payment_id: id платежа
+    """
+
+    try:
+
+        payment = await service.get_payment(db, payment_id)
+
+        return payment
+
+    except ValueError as e:
+
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get(
+    "/payments",
+    responses={
+        200: {"description": "Список платежей получен успешно"},
+    },
+)
+async def get_payments(
+    order_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> list[PaymentResponse]:
+    """
+    Получить список платежей.
+
+    Аргументы:
+    - order_id (опционально): id заказа для фильтрации платежей
+    """
+
+    payments = await service.get_payments(db, order_id)
+
+    return payments
+
+
 @router.post(
     "/payments",
     responses={
