@@ -52,7 +52,7 @@ async def refund(
     payment_id: int, db: AsyncSession = Depends(get_db)
 ) -> PaymentResponse:
     """
-    Создаёт платеж для указанного заказа.
+    Возврат платежа по payment_id
 
     Аргументы:
     - payment_id: id платежа
